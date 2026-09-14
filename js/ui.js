@@ -35,11 +35,17 @@ const setIcon = (useEl, name) => useEl.setAttribute('href', `#i-${name}`);
 /* ---------- feedback ---------- */
 function hideHint() { hintEl.classList.add('gone'); }
 
+// Panels and messages sit just under the top bar, which grows to two rows on narrow screens.
+function placeBelowTopbar(el) {
+  el.style.top = `${Math.round(topbarEl.getBoundingClientRect().bottom + STAGE_GAP)}px`;
+}
+
 function showToast(message, action = null) {
   toastTextEl.textContent = message;
   toastActionEl.hidden = !action;
   toastActionEl.textContent = action ? action.label : '';
   toastActionEl.onclick = action ? () => { hideToast(); action.onClick(); } : null;
+  placeBelowTopbar(toastEl);
   toastEl.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(hideToast, action ? UNDO_TOAST_MS : TOAST_MS);
@@ -67,6 +73,13 @@ function setVolume(level) {
   volumeToggle.setAttribute('aria-pressed', String(volumeLevel === 0));
   volumeToggle.title = volumeLevel === 0 ? 'Unmute all' : 'Mute all (speakers only)';
   setOutputVolume(volumeLevel);
+}
+
+function syncMusicControls() {
+  scaleSelect.value = scaleName;
+  loopInput.value = loopSeconds;
+  loopOut.textContent = `${loopSeconds}s`;
+  renderRecordLoopOptions();
 }
 
 /* ---------- layout ---------- */
@@ -123,6 +136,7 @@ function chooseInstrument(name) {
 
 function openInstrumentMenu() {
   closeHelp();
+  closeLibrary();
   instrumentListEl.hidden = false;
   instrumentButton.setAttribute('aria-expanded', 'true');
   document.getElementById(`instrument-${currentInstrument}`)?.focus();
@@ -156,6 +170,8 @@ function onInstrumentListKeydown(e) {
 /* ---------- shortcuts panel ---------- */
 function openHelp() {
   closeInstrumentMenu();
+  closeLibrary();
+  placeBelowTopbar(helpPanel);
   helpPanel.hidden = false;
   helpButton.setAttribute('aria-expanded', 'true');
 }
@@ -250,6 +266,7 @@ canvas.addEventListener('contextmenu', (e) => {
 function handleEscape() {
   if (recording) stopRecording();
   else if (!instrumentListEl.hidden) closeInstrumentMenu({ focusButton: true });
+  else if (!libraryPanel.hidden) closeLibrary({ focusButton: true });
   else if (!helpPanel.hidden) closeHelp({ focusButton: true });
   else closeResult();
 }
@@ -260,6 +277,8 @@ function handleShortcut(key) {
     if (recording) stopRecording(); else startCountdown();
   } else if (lower === 'm') {
     toggleGardenMute(activeGardenId);
+  } else if (lower === 'l') {
+    toggleLibrary();
   } else if (key === '?') {
     toggleHelp();
   } else if (INSTRUMENT_NAMES[Number(key) - 1]) {
@@ -299,6 +318,7 @@ helpButton.addEventListener('click', toggleHelp);
 document.addEventListener('pointerdown', (e) => {
   if (!instrumentMenuEl.contains(e.target)) closeInstrumentMenu();
   if (!helpPanel.contains(e.target) && !helpButton.contains(e.target)) closeHelp();
+  if (!libraryPanel.contains(e.target) && !libraryButton.contains(e.target)) closeLibrary();
 });
 
 playBtn.addEventListener('click', () => { ensureAudio(); setRunning(!running); });
@@ -342,11 +362,10 @@ gardens = [makeGarden('Garden 1')];
 activeGardenId = gardens[0].id;
 load();
 Object.keys(SCALES).forEach((name) => scaleSelect.add(new Option(name, name)));
-scaleSelect.value = scaleName;
-loopInput.value = loopSeconds;
-loopOut.textContent = `${loopSeconds}s`;
+loopInput.min = MIN_LOOP_SECONDS;
+loopInput.max = MAX_LOOP_SECONDS;
+syncMusicControls();
 setVolume(volumeLevel);
-renderRecordLoopOptions();
 renderInstrumentMenu();
 selectInstrument(currentInstrument);
 renderTabs();

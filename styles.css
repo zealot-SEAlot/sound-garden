@@ -130,6 +130,25 @@ kbd {
 .menu-list li::after { content: "✓"; width: 1em; color: var(--accent); visibility: hidden; }
 .menu-list li[aria-selected="true"]::after { visibility: visible; }
 
+/* ---------- song library ---------- */
+.lib-btn { font-weight: 500; }
+.popover.library {
+  display: flex; flex-direction: column; width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 170px); padding: 14px 8px 8px;
+}
+.panel-head { padding: 0 8px 8px; }
+.panel-head h2 { margin-bottom: 4px; }
+.panel-sub { margin: 0; font-size: 12px; color: var(--dim); }
+.song-list { margin: 0; padding: 0; list-style: none; overflow-y: auto; }
+.song {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; justify-content: stretch;
+  width: 100%; padding: 10px; border: 0; border-radius: 8px; background: transparent; text-align: left;
+}
+.song:hover { background: var(--hover); }
+.song-title { font-weight: 500; }
+.song-meta { grid-column: 1; font-size: 12px; color: var(--dim); }
+.song-dots { display: flex; gap: 4px; grid-column: 2; grid-row: 1 / span 2; }
+
 /* ---------- overlays ---------- */
 .hint {
   position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); width: min(90vw, 480px);
@@ -166,9 +185,10 @@ body.recording .toast, body.recording .popover { display: none; }
 
 /* ---------- narrow screens ---------- */
 @media (max-width: 640px) {
-  .topbar { padding: 8px 12px; gap: 6px; }
-  .brand-name, .rec-label, .topbar .divider { display: none; }
-  .tabs { gap: 4px; }
+  .topbar { flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+  .brand-name, .rec-label, .lib-label, .topbar .divider { display: none; }
+  .topbar-actions { margin-left: auto; }
+  .tabs { order: 3; flex-basis: 100%; gap: 4px; }   /* garden tabs get their own full-width row */
   .dock { gap: 8px 10px; padding: 8px 10px; }
   input[type=range] { width: 64px; }
 }

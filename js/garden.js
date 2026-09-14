@@ -13,8 +13,12 @@ const SAVE_DELAY_MS = 400;            // batch quick changes into one write: sav
 const MAX_FRAME_SECONDS = 0.25;       // keeps tempo steady when frames drop without jumping after a long stall
 const MAX_NOTES_PER_FRAME = 32;       // past this, flowers still glow but stay silent so audio can't overload
 const MAX_SPARKLES = 1200;
-const TARGET_PANE_ASPECT = 1.6;
+const MIN_LOOP_SECONDS = 4;
+const MAX_LOOP_SECONDS = 32;          // long enough for a short song at a relaxed tempo
+const TARGET_PANE_ASPECT = 2.4;       // favour wide panes: the loop runs left to right, so width is time
 const EMPTY_CELL_PENALTY = 0.35;
+const MIN_COMFORTABLE_PANE_HEIGHT = 220;
+const SHORT_PANE_PENALTY = 1;
 
 let gardens = [];
 let activeGardenId = null;
@@ -51,13 +55,16 @@ function makeGarden(name = nextGardenName(), flowers = [], muted = false) {
 }
 
 /* ---------- split-screen layout ---------- */
-// Pick the column count whose panes are closest to a comfortable aspect ratio, with few empty cells.
+// Pick the grid whose panes are wide (width is time) yet tall enough to read the notes, with few empty cells.
 function gridFor(count, area) {
   let best = { cols: 1, rows: count, score: Infinity };
   for (let cols = 1; cols <= count; cols++) {
     const rows = Math.ceil(count / cols);
-    const aspect = (area.w / cols) / (area.h / rows);
-    const score = Math.abs(Math.log(aspect / TARGET_PANE_ASPECT)) + (cols * rows - count) * EMPTY_CELL_PENALTY;
+    const paneHeight = area.h / rows;
+    const aspect = (area.w / cols) / paneHeight;
+    const score = Math.abs(Math.log(aspect / TARGET_PANE_ASPECT))
+      + (cols * rows - count) * EMPTY_CELL_PENALTY
+      + (paneHeight < MIN_COMFORTABLE_PANE_HEIGHT ? SHORT_PANE_PENALTY : 0);
     if (score < best.score) best = { cols, rows, score };
   }
   return best;
@@ -200,7 +207,7 @@ function load() {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (!data) return;
     if (SCALES[data.scaleName]) scaleName = data.scaleName;
-    if (Number.isFinite(data.loopSeconds)) loopSeconds = clamp(data.loopSeconds, 4, 16);
+    if (Number.isFinite(data.loopSeconds)) loopSeconds = clamp(data.loopSeconds, MIN_LOOP_SECONDS, MAX_LOOP_SECONDS);
     if (Number.isFinite(data.volume)) volumeLevel = clamp(data.volume, 0, 100);
     if (RECORD_LOOP_CHOICES.includes(data.recordLoops)) recordLoops = data.recordLoops;
     currentInstrument = validInstrument(data.instrument);

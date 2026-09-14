@@ -8,6 +8,8 @@ const SCALES = {
   'Minor pentatonic': [0, 3, 5, 7, 10],
   'Dreamy lydian': [0, 2, 4, 6, 7, 9, 11],
   'Japanese in': [0, 1, 5, 7, 8],
+  'Major': [0, 2, 4, 5, 7, 9, 11],   // full seven-note scales, which most songs need
+  'Minor': [0, 2, 3, 5, 7, 8, 10],
 };
 const BASE_MIDI = 48;          // C3
 const OCTAVES = 3;

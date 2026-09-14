@@ -1,6 +1,6 @@
 # 🌙 Sound Garden
 
-A little musical toy for your browser. Plant glowing flowers on a night sky, and a moonbeam sweeps across to play them on a loop. Add more gardens and they all play together.
+A little musical toy for your browser. Plant glowing flowers on a night sky, and a moonbeam sweeps across to play them on a loop. Add more gardens and they all play together, or load a song from the library.
 
 **▶ Play it: https://nathanflorencecasas-create.github.io/sound-garden/**
 
@@ -10,8 +10,20 @@ A little musical toy for your browser. Plant glowing flowers on a night sky, and
   Bell (gold) · Marimba (pink) · Harp (teal) · Flute (violet) · Piano (blue) · Kalimba (green) · Strings (magenta) · Bass (lime, plays an octave lower)
 - **Click** anywhere in a garden to plant a flower. Higher flowers sing higher notes. Each garden holds up to 300 flowers.
 - **Drag** a flower to move it, even into another garden. Drag it out of the gardens (or right-click it) to pull it up.
-- **Space** pauses and resumes. **Loop**, **Scale** and **Volume** sit next to the play button; click the speaker icon to mute everything. Volume only changes your speakers; recordings always stay at full level.
+- **Space** pauses and resumes. **Loop** (4–32 seconds), **Scale** and **Volume** sit next to the play button; click the speaker icon to mute everything. Volume only changes your speakers; recordings always stay at full level.
 - Press **?** (or the help button in the top bar) to see every keyboard shortcut.
+
+## Song library
+
+Open **Library** in the top bar (or press **L**) and pick a song. It replaces your gardens with ready-made ones that play it, and you can undo right after. Each part gets its own garden, so you can mute the melody and sing along. The current songs, all public domain:
+
+- Twinkle Twinkle Little Star
+- Mary Had a Little Lamb
+- Frère Jacques, as a three-voice round
+- Ode to Joy
+- Jingle Bells (chorus)
+
+To add a song, add an entry to `SONGS` in `js/songs.js`. Notes are written like `C4 E4:2 - G3+B3:4`: a note and octave (C4 is middle C), `:beats` for its length, `-` for a rest and `+` for a chord.
 
 ## Gardens
 
@@ -42,6 +54,8 @@ No install or build step. Download the project (**Code → Download ZIP**), unzi
 | `js/draw.js` | Drawing the sky, gardens and flowers |
 | `js/recording.js` | Video recording |
 | `js/tabs.js` | Garden tabs: add, remove, mute, and the active garden's actions |
+| `js/songs.js` | Song library data and the note format |
+| `js/library.js` | The library panel and loading songs |
 | `js/ui.js` | Menus, controls, shortcuts, mouse and keyboard input |
 
 ## Built with
