@@ -1,37 +1,40 @@
-/* Interface: garden tabs, the active-garden chip, instrument menu, dock controls, pointer + keyboard input, boot. */
+/* Interface: feedback, layout, instrument menu, shortcuts panel, dock controls, pointer + keyboard input, boot. */
 
 const TOAST_MS = 4000;
 const UNDO_TOAST_MS = 6000;
 const STAGE_GAP = 8;
 const MIN_STAGE_HEIGHT = 120;
-const CHIP_INSET = 8;
 
 const topbarEl = document.getElementById('topbar');
 const dockEl = document.getElementById('dock');
 const hintEl = document.getElementById('hint');
-const tabListEl = document.getElementById('tabList');
-const addGardenBtn = document.getElementById('addGarden');
-const chipEl = document.getElementById('paneChip');
-const chipNameEl = document.getElementById('paneChipName');
 const instrumentMenuEl = document.getElementById('instrumentMenu');
 const instrumentButton = document.getElementById('instrumentButton');
 const instrumentLabelEl = document.getElementById('instrumentLabel');
 const instrumentListEl = document.getElementById('instrumentList');
+const helpButton = document.getElementById('helpButton');
+const helpPanel = document.getElementById('helpPanel');
 const playBtn = document.getElementById('play');
+const playIcon = document.getElementById('playIcon');
 const loopInput = document.getElementById('loop');
 const loopOut = document.getElementById('loopOut');
 const scaleSelect = document.getElementById('scale');
 const volumeInput = document.getElementById('volume');
 const volumeOut = document.getElementById('volumeOut');
+const volumeToggle = document.getElementById('volumeToggle');
 const volumeIcon = document.getElementById('volumeIcon');
 const toastEl = document.getElementById('toast');
 const toastTextEl = document.getElementById('toastText');
 const toastActionEl = document.getElementById('toastAction');
 
+let toastTimer = null;
+let volumeBeforeMute = DEFAULT_VOLUME;
+
+const setIcon = (useEl, name) => useEl.setAttribute('href', `#i-${name}`);
+
 /* ---------- feedback ---------- */
 function hideHint() { hintEl.classList.add('gone'); }
 
-let toastTimer = null;
 function showToast(message, action = null) {
   toastTextEl.textContent = message;
   toastActionEl.hidden = !action;
@@ -50,16 +53,19 @@ function hideToast() {
 function setRunning(next) {
   running = next;
   const label = running ? 'Pause' : 'Play';
-  playBtn.textContent = running ? '⏸' : '▶';
+  setIcon(playIcon, running ? 'pause' : 'play');
   playBtn.setAttribute('aria-label', label);
   playBtn.title = `${label} (Space)`;
 }
 
 function setVolume(level) {
   volumeLevel = clamp(level, 0, 100);
+  if (volumeLevel > 0) volumeBeforeMute = volumeLevel;
   volumeInput.value = volumeLevel;
   volumeOut.textContent = `${volumeLevel}%`;
-  volumeIcon.textContent = volumeLevel === 0 ? '🔇' : volumeLevel < 50 ? '🔉' : '🔊';
+  setIcon(volumeIcon, volumeLevel === 0 ? 'volume-off' : volumeLevel < 50 ? 'volume-low' : 'volume');
+  volumeToggle.setAttribute('aria-pressed', String(volumeLevel === 0));
+  volumeToggle.title = volumeLevel === 0 ? 'Unmute all' : 'Mute all (speakers only)';
   setOutputVolume(volumeLevel);
 }
 
@@ -71,145 +77,6 @@ function relayout() {
   const bottom = fullScreen ? H : dockEl.getBoundingClientRect().top - STAGE_GAP;
   layoutPanes({ x: 0, y: top, w: W, h: Math.max(MIN_STAGE_HEIGHT, bottom - top) });
   positionChip();
-}
-
-function positionChip() {
-  const index = gardenIndex(activeGardenId);
-  const rect = paneRects[index];
-  if (!rect) return;
-  chipNameEl.textContent = gardens[index].name;
-  chipEl.style.transform = `translate(${Math.round(rect.x + CHIP_INSET)}px, ${Math.round(rect.y + CHIP_INSET)}px)`;
-}
-
-/* ---------- garden tabs ---------- */
-function makeTab(garden) {
-  const isActive = garden.id === activeGardenId;
-  const wrap = document.createElement('div');
-  wrap.className = `tab${isActive ? ' active' : ''}`;
-  wrap.setAttribute('role', 'presentation');
-  const tab = document.createElement('button');
-  tab.id = `garden-tab-${garden.id}`;
-  tab.className = 'tab-name';
-  tab.setAttribute('role', 'tab');
-  tab.setAttribute('aria-selected', String(isActive));
-  tab.tabIndex = isActive ? 0 : -1;
-  tab.textContent = garden.name;
-  tab.addEventListener('click', () => setActiveGarden(garden.id));
-  tab.addEventListener('keydown', onTabKeydown);
-  wrap.append(tab);
-  if (gardens.length > 1) {
-    const close = document.createElement('button');
-    close.className = 'tab-close';
-    close.textContent = '×';
-    close.title = `Remove ${garden.name}`;
-    close.setAttribute('aria-label', `Remove ${garden.name}`);
-    close.addEventListener('click', () => removeGarden(garden.id));
-    wrap.append(close);
-  }
-  return wrap;
-}
-
-function renderTabs() {
-  tabListEl.replaceChildren(...gardens.map(makeTab));
-  const full = gardens.length >= MAX_GARDENS;
-  addGardenBtn.disabled = full;
-  addGardenBtn.title = full ? `Up to ${MAX_GARDENS} gardens for now` : 'Add a garden that plays alongside the others';
-}
-
-function onTabKeydown(e) {
-  const index = gardenIndex(activeGardenId);
-  const moves = { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: gardens.length - 1 };
-  if (!(e.key in moves)) return;
-  e.preventDefault();
-  const next = gardens[clamp(moves[e.key], 0, gardens.length - 1)];
-  setActiveGarden(next.id);
-  document.getElementById(`garden-tab-${next.id}`)?.focus();
-}
-
-function setActiveGarden(id) {
-  if (gardenIndex(id) === -1) return;
-  if (id !== activeGardenId) {
-    activeGardenId = id;
-    renderTabs();
-    document.getElementById(`garden-tab-${id}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    save();
-  }
-  positionChip();
-}
-
-function addGarden() {
-  if (gardens.length >= MAX_GARDENS || recording) return;
-  const garden = makeGarden();
-  gardens = [...gardens, garden];
-  renderTabs();
-  relayout();
-  setActiveGarden(garden.id);
-  save();
-}
-
-function removeGarden(id) {
-  const index = gardenIndex(id);
-  if (index === -1 || gardens.length <= 1) return;
-  const removed = gardens[index];
-  gardens = gardens.filter((g) => g.id !== id);
-  if (activeGardenId === id) activeGardenId = gardens[Math.min(index, gardens.length - 1)].id;
-  renderTabs();
-  relayout();
-  save();
-  showToast(`${removed.name} removed`, { label: 'Undo', onClick: () => restoreGarden(removed, index) });
-}
-
-function restoreGarden(garden, index) {
-  if (gardenIndex(garden.id) !== -1) return;
-  if (gardens.length >= MAX_GARDENS) {
-    showToast(`Couldn't bring back ${garden.name}: you already have ${MAX_GARDENS} gardens.`);
-    return;
-  }
-  gardens = [...gardens.slice(0, index), garden, ...gardens.slice(index)];
-  renderTabs();
-  relayout();
-  setActiveGarden(garden.id);
-  save();
-}
-
-function surpriseInActiveGarden() {
-  const index = gardenIndex(activeGardenId);
-  const garden = gardens[index];
-  const room = Math.min(SURPRISE_COUNT, MAX_FLOWERS_PER_GARDEN - garden.flowers.length);
-  ensureAudio();
-  hideHint();
-  if (room <= 0) {
-    showToast(`${garden.name} is full (${MAX_FLOWERS_PER_GARDEN} flowers).`);
-    return;
-  }
-  const fresh = Array.from({ length: room }, () =>
-    makeFlower(0.05 + Math.random() * 0.9, snapY(0.1 + Math.random() * 0.7), randomInstrument()));
-  garden.flowers = [...garden.flowers, ...fresh];
-  fresh.forEach((f) => {
-    const p = flowerPoint(f, paneRects[index]);
-    burst(p.x, p.y, hueOf(f), 8);
-  });
-  save();
-}
-
-function clearActiveGarden() {
-  const index = gardenIndex(activeGardenId);
-  const garden = gardens[index];
-  if (!garden.flowers.length) return;
-  const previous = garden.flowers;
-  previous.forEach((f) => {
-    const p = flowerPoint(f, paneRects[index]);
-    burst(p.x, p.y, hueOf(f), 3, true);
-  });
-  garden.flowers = [];
-  save();
-  showToast(`Cleared ${garden.name}`, {
-    label: 'Undo',
-    onClick: () => {
-      garden.flowers = [...previous, ...garden.flowers].slice(0, MAX_FLOWERS_PER_GARDEN);
-      save();
-    },
-  });
 }
 
 /* ---------- instrument menu ---------- */
@@ -255,6 +122,7 @@ function chooseInstrument(name) {
 }
 
 function openInstrumentMenu() {
+  closeHelp();
   instrumentListEl.hidden = false;
   instrumentButton.setAttribute('aria-expanded', 'true');
   document.getElementById(`instrument-${currentInstrument}`)?.focus();
@@ -285,6 +153,24 @@ function onInstrumentListKeydown(e) {
   e.stopPropagation();
 }
 
+/* ---------- shortcuts panel ---------- */
+function openHelp() {
+  closeInstrumentMenu();
+  helpPanel.hidden = false;
+  helpButton.setAttribute('aria-expanded', 'true');
+}
+
+function closeHelp({ focusButton = false } = {}) {
+  if (helpPanel.hidden) return;
+  helpPanel.hidden = true;
+  helpButton.setAttribute('aria-expanded', 'false');
+  if (focusButton) helpButton.focus();
+}
+
+function toggleHelp() {
+  if (helpPanel.hidden) openHelp(); else closeHelp();
+}
+
 /* ---------- pointer input ---------- */
 function plantAt({ garden, rect }, px, py) {
   if (garden.flowers.length >= MAX_FLOWERS_PER_GARDEN) {
@@ -293,7 +179,7 @@ function plantAt({ garden, rect }, px, py) {
   }
   const f = makeFlower((px - rect.x) / rect.w, snapY((py - rect.y) / rect.h));
   garden.flowers = [...garden.flowers, f];
-  trigger(f, rect);
+  trigger(f, rect, garden);
   save();
 }
 
@@ -317,7 +203,7 @@ function endDrag() {
   from.flowers = from.flowers.filter((f) => f !== flower);
   over.garden.flowers = [...over.garden.flowers, placed];
   setActiveGarden(over.garden.id);
-  trigger(placed, over.rect);
+  trigger(placed, over.rect, over.garden);
   save();
 }
 
@@ -364,7 +250,24 @@ canvas.addEventListener('contextmenu', (e) => {
 function handleEscape() {
   if (recording) stopRecording();
   else if (!instrumentListEl.hidden) closeInstrumentMenu({ focusButton: true });
+  else if (!helpPanel.hidden) closeHelp({ focusButton: true });
   else closeResult();
+}
+
+function handleShortcut(key) {
+  const lower = key.toLowerCase();
+  if (lower === 'r') {
+    if (recording) stopRecording(); else startCountdown();
+  } else if (lower === 'm') {
+    toggleGardenMute(activeGardenId);
+  } else if (key === '?') {
+    toggleHelp();
+  } else if (INSTRUMENT_NAMES[Number(key) - 1]) {
+    selectInstrument(INSTRUMENT_NAMES[Number(key) - 1], { preview: true });
+  } else {
+    return false;
+  }
+  return true;
 }
 
 window.addEventListener('keydown', (e) => {
@@ -375,15 +278,7 @@ window.addEventListener('keydown', (e) => {
   }
   const el = e.target instanceof Element ? e.target : document.body;
   if (el.closest('input, select, textarea, [role="option"]')) return;
-  if (e.key === 'r' || e.key === 'R') {
-    if (recording) stopRecording(); else startCountdown();
-    return;
-  }
-  const numbered = INSTRUMENT_NAMES[Number(e.key) - 1];
-  if (numbered) {
-    selectInstrument(numbered, { preview: true });
-    return;
-  }
+  if (handleShortcut(e.key)) return;
   if (e.code !== 'Space' || recording || el.closest('button, a')) return;   // let focused buttons handle Space
   e.preventDefault();
   ensureAudio();
@@ -391,10 +286,6 @@ window.addEventListener('keydown', (e) => {
 });
 
 /* ---------- controls ---------- */
-addGardenBtn.addEventListener('click', addGarden);
-document.getElementById('surprise').addEventListener('click', surpriseInActiveGarden);
-document.getElementById('clear').addEventListener('click', clearActiveGarden);
-
 instrumentButton.addEventListener('click', () => {
   if (instrumentListEl.hidden) openInstrumentMenu(); else closeInstrumentMenu();
 });
@@ -404,11 +295,19 @@ instrumentButton.addEventListener('keydown', (e) => {
   openInstrumentMenu();
 });
 instrumentListEl.addEventListener('keydown', onInstrumentListKeydown);
+helpButton.addEventListener('click', toggleHelp);
 document.addEventListener('pointerdown', (e) => {
   if (!instrumentMenuEl.contains(e.target)) closeInstrumentMenu();
+  if (!helpPanel.contains(e.target) && !helpButton.contains(e.target)) closeHelp();
 });
 
 playBtn.addEventListener('click', () => { ensureAudio(); setRunning(!running); });
+
+volumeToggle.addEventListener('click', () => {
+  ensureAudio();
+  setVolume(volumeLevel === 0 ? volumeBeforeMute : 0);
+  save();
+});
 
 volumeInput.addEventListener('input', () => {
   setVolume(Number(volumeInput.value));
@@ -457,6 +356,8 @@ if (gardens.some((g) => g.flowers.length)) {
 resizeCanvas();
 relayout();
 window.addEventListener('resize', () => { resizeCanvas(); relayout(); });
+window.addEventListener('pagehide', flushSave);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
 if (window.ResizeObserver) {
   const barObserver = new ResizeObserver(relayout);
   barObserver.observe(topbarEl);

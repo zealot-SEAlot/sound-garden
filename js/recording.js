@@ -55,6 +55,7 @@ function startCountdown() {
   hideToast();
   closeResult();
   closeInstrumentMenu();
+  closeHelp();
   recording = { stage: 'countdown', loops: recordLoops, loopsDone: 0, recorder: null, timer: null };
   setRecordingMode(true);
   setRunning(false);

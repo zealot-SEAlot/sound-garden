@@ -138,12 +138,32 @@ function setOutputVolume(level) {
   if (audio) audio.volume.gain.setTargetAtTime(volumeGain(level), audio.ac.currentTime, 0.03);
 }
 
-function playNote(f) {
+/* ---------- per-garden channels ---------- */
+// Each garden plays through its own gain node, so muting silences notes that are still ringing, not just new ones.
+const MUTE_RAMP_SECONDS = 0.03;
+const gardenBuses = new Map();   // garden id -> GainNode
+
+function gardenBus(garden) {
+  let bus = gardenBuses.get(garden.id);
+  if (!bus) {
+    bus = audio.ac.createGain();
+    bus.gain.value = garden.muted ? 0 : 1;
+    bus.connect(audio.voices);
+    gardenBuses.set(garden.id, bus);
+  }
+  return bus;
+}
+
+function setGardenMuted(garden) {
+  if (audio) gardenBus(garden).gain.setTargetAtTime(garden.muted ? 0 : 1, audio.ac.currentTime, MUTE_RAMP_SECONDS);
+}
+
+function playNote(f, garden = null) {
   if (!audio) return;
   const { ac, voices } = audio;
   const panner = ac.createStereoPanner();
   panner.pan.value = clamp(f.x * 2 - 1, -1, 1);
-  panner.connect(voices);
+  panner.connect(garden ? gardenBus(garden) : voices);   // instrument previews have no garden
   const freq = 440 * 2 ** ((midiFor(f.y) - 69) / 12);
   INSTRUMENTS[f.instrument].play(ac, panner, freq, ac.currentTime);
 }

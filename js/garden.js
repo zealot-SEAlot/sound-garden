@@ -5,9 +5,11 @@ const MAX_FLOWERS_PER_GARDEN = 300;
 const MAX_NAME_LENGTH = 24;
 const FLOWER_RADIUS_MAX = 14;
 const FLOWER_RADIUS_MIN = 7;
+const FLOWER_HIT_SCALE = 1.8;         // how far from a flower's centre a click still grabs it, in radii
 const EDGE_MARGIN = 16;               // px from the window edge that counts as "off-screen"
 const SURPRISE_COUNT = 9;
 const STORAGE_KEY = 'sound-garden-v1'; // original key kept so older saves still load (see load)
+const SAVE_DELAY_MS = 400;            // batch quick changes into one write: saving 2,400 flowers takes ~10 ms
 const MAX_FRAME_SECONDS = 0.25;       // keeps tempo steady when frames drop without jumping after a long stall
 const MAX_NOTES_PER_FRAME = 32;       // past this, flowers still glow but stay silent so audio can't overload
 const MAX_SPARKLES = 1200;
@@ -24,6 +26,7 @@ let loopSeconds = 8;
 let phase = 0;
 let running = true;
 let drag = null;                      // { flower, from, over, px, py, moved }
+let saveTimer = null;
 
 const hueOf = (f) => INSTRUMENTS[f.instrument].hue;
 const validInstrument = (name) => (INSTRUMENTS[name] ? name : DEFAULT_INSTRUMENT);
@@ -43,8 +46,8 @@ function nextGardenName() {
   return `Garden ${n}`;
 }
 
-function makeGarden(name = nextGardenName(), flowers = []) {
-  return { id: nextGardenId++, name, flowers };
+function makeGarden(name = nextGardenName(), flowers = [], muted = false) {
+  return { id: nextGardenId++, name, flowers, muted };
 }
 
 /* ---------- split-screen layout ---------- */
@@ -83,10 +86,13 @@ function pointerTarget(px, py) {
 }
 
 function flowerAt({ garden, rect }, px, py) {
-  const reach = flowerRadius(rect) * 1.8;
+  const reach = flowerRadius(rect) * FLOWER_HIT_SCALE;
+  const reachSq = reach * reach;
   for (let i = garden.flowers.length - 1; i >= 0; i--) {
-    const p = flowerPoint(garden.flowers[i], rect);
-    if (Math.hypot(p.x - px, p.y - py) < reach) return garden.flowers[i];
+    const f = garden.flowers[i];
+    const dx = rect.x + f.x * rect.w - px;
+    const dy = rect.y + f.y * rect.h - py;
+    if (dx * dx + dy * dy < reachSq) return f;
   }
   return null;
 }
@@ -101,11 +107,11 @@ function burst(x, y, hue, count, fall = false) {
   }
 }
 
-function trigger(f, rect, withSound = true) {
+function trigger(f, rect, garden, withSound = true) {
   f.glow = 1;
   const p = flowerPoint(f, rect);
   burst(p.x, p.y, hueOf(f), 6);
-  if (withSound) playNote(f);
+  if (withSound) playNote(f, garden);
 }
 
 function removeFlower(garden, flower, x, y) {
@@ -127,8 +133,9 @@ function advance(dt) {
     if (!rect) return;
     for (const f of garden.flowers) {
       if (f === drag?.flower || !crossed(f)) continue;
-      trigger(f, rect, notes < MAX_NOTES_PER_FRAME);
-      notes += 1;
+      const audible = !garden.muted && notes < MAX_NOTES_PER_FRAME;   // muted gardens glow without using the note budget
+      trigger(f, rect, garden, audible);
+      if (audible) notes += 1;
     }
   });
   if (wrapped) onLoopWrapped();
@@ -156,12 +163,23 @@ function update(dt) {
 
 /* ---------- saving ---------- */
 function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, SAVE_DELAY_MS);
+}
+
+function flushSave() {
+  if (saveTimer) saveNow();
+}
+
+function saveNow() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
   try {
     const data = {
       version: 2, scaleName, loopSeconds, volume: volumeLevel, recordLoops, instrument: currentInstrument,
       activeGarden: Math.max(0, gardenIndex(activeGardenId)),
-      gardens: gardens.map(({ name, flowers }) => ({
-        name, flowers: flowers.map(({ x, y, instrument }) => ({ x, y, instrument })),
+      gardens: gardens.map(({ name, muted, flowers }) => ({
+        name, muted, flowers: flowers.map(({ x, y, instrument }) => ({ x, y, instrument })),
       })),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -174,7 +192,7 @@ function parseGarden(saved, index) {
     .filter((f) => Number.isFinite(f?.x) && Number.isFinite(f?.y))
     .slice(0, MAX_FLOWERS_PER_GARDEN)
     .map((f) => makeFlower(clamp(f.x, 0, 1), clamp(f.y, 0, 1), validInstrument(f.instrument)));
-  return makeGarden(rawName || `Garden ${index + 1}`, flowers);
+  return makeGarden(rawName || `Garden ${index + 1}`, flowers, saved?.muted === true);
 }
 
 function load() {
