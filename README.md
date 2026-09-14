@@ -43,6 +43,16 @@ Your gardens are saved in your browser, so they're still there when you come bac
 
 No install or build step. Download the project (**Code → Download ZIP**), unzip it, and open `index.html` in any modern browser (turn your sound on).
 
+## Run the tests
+
+With [Node.js](https://nodejs.org/) 18 or newer, run this from the project folder:
+
+```bash
+node --test
+```
+
+The tests check the song library: every song fits the garden limits, every part has the right number of beats, and every flower plays exactly the note that was written.
+
 ## Project layout
 
 | File | What it does |
