@@ -96,6 +96,58 @@ const INSTRUMENTS = {
       vibrato.stop(t + 1.6);
     },
   },
+  piano: {
+    label: 'Piano', hue: 212, petals: 4,
+    play(ac, out, freq, t) {
+      const env = envelope(ac, out, t, { attack: 0.004, peak: 0.2, decay: 1.8 });
+      const filter = ac.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(Math.min(freq * 12, 16000), t);
+      filter.frequency.exponentialRampToValueAtTime(freq * 2.5, t + 1.2);   // bright hammer strike that mellows
+      filter.connect(env);
+      [[1, 1], [2, 0.4], [3, 0.15], [4, 0.08]].forEach(([mult, level]) =>
+        tone(ac, filter, { type: 'triangle', freq: freq * mult, start: t, stop: t + 1.9, level }));
+    },
+  },
+  kalimba: {
+    label: 'Kalimba', hue: 122, petals: 3,
+    play(ac, out, freq, t) {
+      const tine = envelope(ac, out, t, { attack: 0.002, peak: 0.26, decay: 1.1 });
+      tone(ac, tine, { type: 'sine', freq, start: t, stop: t + 1.2 });
+      const ping = envelope(ac, out, t, { attack: 0.001, peak: 0.07, decay: 0.12 });
+      tone(ac, ping, { type: 'sine', freq: freq * 5.4, start: t, stop: t + 0.15 });   // metallic overtone of the tine
+    },
+  },
+  strings: {
+    label: 'Strings', hue: 300, petals: 9,
+    play(ac, out, freq, t) {
+      const env = envelope(ac, out, t, { attack: 0.22, peak: 0.24, decay: 1.8 });
+      const filter = ac.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = Math.min(freq * 4, 8000);
+      filter.Q.value = 0.5;
+      filter.connect(env);
+      [-7, 7].forEach((cents) => {
+        const osc = tone(ac, filter, { type: 'sawtooth', freq, start: t, stop: t + 2.1, level: 0.6 });
+        osc.detune.value = cents;   // two slightly detuned voices give an ensemble shimmer
+      });
+    },
+  },
+  bass: {
+    label: 'Bass', hue: 85, petals: 10,
+    play(ac, out, freq, t) {
+      const low = freq / 2;   // sounds an octave below its row, for bass lines
+      const env = envelope(ac, out, t, { attack: 0.006, peak: 0.3, decay: 0.8 });
+      const filter = ac.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 3;
+      filter.frequency.setValueAtTime(low * 8, t);
+      filter.frequency.exponentialRampToValueAtTime(low * 1.5, t + 0.4);
+      filter.connect(env);
+      tone(ac, filter, { type: 'triangle', freq: low, start: t, stop: t + 0.9 });
+      tone(ac, filter, { type: 'square', freq: low, start: t, stop: t + 0.9, level: 0.25 });
+    },
+  },
 };
 const INSTRUMENT_NAMES = Object.keys(INSTRUMENTS);
 const DEFAULT_INSTRUMENT = INSTRUMENT_NAMES[0];
