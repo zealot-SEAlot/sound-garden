@@ -6,6 +6,8 @@ A little musical toy for your browser. Plant glowing flowers on a night sky, and
 
 ## How to play
 
+- **Pick an instrument** in the bottom bar (or press **1–4**). Each has its own colour and petal count:
+  🟡 Bell · 🩷 Marimba · 🩵 Harp · 🟣 Flute
 - **Click** anywhere to plant a flower. Higher flowers sing higher notes.
 - **Drag** a flower to move it. Drag it off the edge (or right-click it) to pull it up.
 - **Space** pauses and resumes the loop.
